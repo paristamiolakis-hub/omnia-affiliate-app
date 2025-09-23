@@ -35,25 +35,36 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const rawQuery = body?.query || "";
-    const country = normalizeCountry(body?.country);
+
+    // ✅ country από body → query (?country) → cookie → header → fallback GR
+    const resolvedCountry =
+      body?.country ||
+      req.nextUrl.searchParams.get("country") ||
+      req.cookies.get("country")?.value ||
+      req.headers.get("x-country") ||
+      "GR";
+    const country = normalizeCountry(resolvedCountry);
+
     const uiCheckin = body?.checkin as string | undefined;
     const uiCheckout = body?.checkout as string | undefined;
 
+    // 🔎 intent & dates
     const intent: Intent = detectIntent(rawQuery);
-
     const parsedDates = parseDatesFromQuery(rawQuery);
     const checkin = uiCheckin || parsedDates.checkin;
     const checkout = uiCheckout || parsedDates.checkout;
 
+    // 🎯 destination (μόνο για hotels/cars/tours κάνουμε extract)
     const dest =
       intent === "hotels" || intent === "cars" || intent === "tours"
         ? extractDestination(rawQuery)
         : rawQuery;
 
+    // 🤝 partners ανά χώρα
     let partners = forCountry(byCategory(intent), country);
-    // Αν θες προσωρινά να κρύψεις Agoda από το Smart Search:
-    // partners = partners.filter(p => p.id !== "agoda");
+    // partners = partners.filter(p => p.id !== "agoda"); // optional hide
 
+    // 🧠 build suggestions (flights = IATA, αλλιώς dest)
     const suggestions = partners.slice(0, 3).map((p) => {
       let url: string;
       if (intent === "flights") {
@@ -77,7 +88,6 @@ export async function POST(req: NextRequest) {
       suggestions,
     });
   } catch (err: any) {
-    // Βοηθητικό error για να δεις τι σπάει από το UI
     return NextResponse.json(
       { ok: false, error: String(err?.message || err) },
       { status: 500 }
