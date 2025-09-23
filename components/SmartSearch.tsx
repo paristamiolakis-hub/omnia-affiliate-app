@@ -25,26 +25,27 @@ export default function SmartSearch() {
   }
 
   async function run() {
-    setLoading(true);
-    setError(null);
-    setSuggestions([]);
-    try {
-      const res = await fetch('/api/suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, country, checkin, checkout })
-      });
-      if (!res.ok) throw new Error('Bad response');
-      const data = await res.json();
-      setSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
-      if (!data?.suggestions?.length) setError('No suggestions yet for this query.');
-    } catch (e) {
-      setError('Suggestion engine failed.');
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  setError(null);
+  setSuggestions([]);
+  try {
+    const res = await fetch('/api/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, country, checkin, checkout })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
     }
+    setSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
+    if (!data?.suggestions?.length) setError('No suggestions yet for this query.');
+  } catch (e: any) {
+    setError(String(e?.message || e) || 'Suggestion engine failed.');
+  } finally {
+    setLoading(false);
   }
-
+}
   return (
     <div className="card" style={{marginBottom:16}}>
       <h3>Smart Search</h3>

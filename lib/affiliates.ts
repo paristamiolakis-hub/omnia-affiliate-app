@@ -189,50 +189,44 @@ const rentalcars: Affiliate = {
   }
 };
 
-// Skyscanner (Flights) with country-specific domain + locale/currency
-const SKYSCANNER_DOMAIN: Record<CountryCode, string> = {
-  GR: "www.skyscanner.net",
-  CY: "www.skyscanner.net",
-  GB: "www.skyscanner.net",
-  DE: "www.skyscanner.de",
-  FR: "www.skyscanner.fr",
-  IT: "www.skyscanner.it",
-  ES: "www.skyscanner.es",
-  US: "www.skyscanner.com",
-  AE: "www.skyscanner.ae",
-  SA: "www.skyscanner.net",
-  RS: "www.skyscanner.net",
-  BG: "www.skyscanner.net"
-};
-
+// Skyscanner (Flights) with country-specific domain + locale/currency + deeplink (IATA + dates)
 const skyscanner: Affiliate = {
   id: "skyscanner",
   name: "Skyscanner",
   category: "flights",
   description: "Flight search & deals",
   countries: "ALL",
-  buildUrl: ({ country } = {}) => {
+  buildUrl: ({ q, country, checkin, checkout } = {}) => {
     const pid = env("NEXT_PUBLIC_SKYSCANNER_PID", "YOUR_PARTNER_ID");
     const cc = (country || "GR") as CountryCode;
     const domain = SKYSCANNER_DOMAIN[cc] || "www.skyscanner.net";
     const locale = COUNTRY_LOCALE[cc] || "en-GB";
     const currency = COUNTRY_CURRENCY[cc] || "EUR";
-    return `https://${domain}/?associateid=${e(pid)}&locale=${e(locale)}&currency=${e(currency)}`;
-  }
-};
 
-// GetYourGuide (Tours/Activities)
-const gyg: Affiliate = {
-  id: "getyourguide",
-  name: "GetYourGuide",
-  category: "tours",
-  description: "Tours, attractions & activities",
-  countries: "ALL",
-  buildUrl: ({ q } = {}) => {
-    const aff = env("NEXT_PUBLIC_GETYOURGUIDE_AFFID", "YOUR_GETYOURGUIDE_ID");
-    let url = `https://www.getyourguide.com/?partner_id=${e(aff)}`;
-    if (q) url += `&q=${e(q)}`;
-    return url;
+    // Περιμένουμε q είτε ως "ATH-LON" είτε ως "ATH LON" (origin-destination)
+    let origin = "";
+    let dest = "";
+    if (q) {
+      const m = q.toUpperCase().match(/\b([A-Z]{3})\s*[-\s]\s*([A-Z]{3})\b/);
+      if (m) { origin = m[1]; dest = m[2]; }
+    }
+
+    // Αν δεν δόθηκαν IATA, απλά ανοίγουμε την αρχική με locale/currency
+    if (!origin || !dest) {
+      return `https://${domain}/?associateid=${e(pid)}&locale=${e(locale)}&currency=${e(currency)}`;
+    }
+
+    // Skyscanner URL pattern (deeplink) — ημερομηνίες σε YYYY-MM-DD
+    // Example: /transport/flights/ATH/LHR/2025-12-22/2025-12-29
+    const dateOut = checkin || "";
+    const dateRet = checkout || "";
+
+    let path = `/transport/flights/${origin}/${dest}`;
+    if (dateOut) path += `/${dateOut}`;
+    if (dateRet) path += `/${dateRet}`;
+
+    // Προσθέτουμε και query params για partner/locale/currency
+    return `https://${domain}${path}?associateid=${e(pid)}&locale=${e(locale)}&currency=${e(currency)}`;
   }
 };
 
