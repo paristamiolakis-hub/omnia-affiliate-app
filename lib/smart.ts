@@ -1,5 +1,6 @@
 // lib/smart.ts
-import { CountryCode } from "/lib/countries";
+import { CountryCode } from "./countries";
+import { addDays, nextDay } from "date-fns";
 
 export type Intent = "hotels" | "cars" | "flights" | "tours" | "shops" | "finance";
 
@@ -92,7 +93,6 @@ export function parseDatesFromQuery(raw: string, today = new Date()): ParsedDate
 }
 
 function stripTime(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
 function parseISO(s: string) { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
 
 // ---------------- Flights parsing (very light) ----------------
