@@ -132,11 +132,11 @@ const HCOM_SUBDOMAIN: Record<CountryCode, string> = {
   AE: "en", SA: "en",
   RS: "sr", BG: "bg"
 };
-const HCOM_POS: Record<CountryCode, string> = {
+const HCOM_POS: Partial<Record<CountryCode, string>> = {
   GR: "HCOM_GR", GB: "HCOM_UK", US: "HCOM_US",
   DE: "HCOM_DE", FR: "HCOM_FR", IT: "HCOM_IT", ES: "HCOM_ES"
 };
-const HCOM_SITEID: Record<CountryCode, string> = {
+const HCOM_SITEID: Partial<Record<CountryCode, string>> = {
   GR: "300000021", US: "300000001", GB: "300000002",
   DE: "300000003", FR: "300000004", IT: "300000005", ES: "300000006"
 };
