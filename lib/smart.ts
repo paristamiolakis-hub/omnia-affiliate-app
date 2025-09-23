@@ -1,5 +1,5 @@
 // lib/smart.ts
-import { CountryCode } from "@/lib/countries";
+import { CountryCode } from "/lib/countries";
 
 export type Intent = "hotels" | "cars" | "flights" | "tours" | "shops" | "finance";
 
