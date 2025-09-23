@@ -1,5 +1,6 @@
 import { CountryCode } from "./countries";
 
+
 export type Category = "hotels" | "cars" | "flights" | "tours" | "shops" | "finance";
 
 export interface Affiliate {
@@ -188,7 +189,20 @@ const rentalcars: Affiliate = {
     return url;
   }
 };
-
+const SKYSCANNER_DOMAIN: Record<CountryCode, string> = {
+  GR: "www.skyscanner.net",
+  CY: "www.skyscanner.net",
+  GB: "www.skyscanner.net",
+  DE: "www.skyscanner.de",
+  FR: "www.skyscanner.fr",
+  IT: "www.skyscanner.it",
+  ES: "www.skyscanner.es",
+  US: "www.skyscanner.com",
+  AE: "www.skyscanner.ae",
+  SA: "www.skyscanner.net",
+  RS: "www.skyscanner.net",
+  BG: "www.skyscanner.net",
+};
 // Skyscanner (Flights) with country-specific domain + locale/currency + deeplink (IATA + dates)
 const skyscanner: Affiliate = {
   id: "skyscanner",
@@ -262,7 +276,20 @@ const revolut: Affiliate = {
     return `https://revolut.com/referral/${e(cid)}`;
   }
 };
-
+// GetYourGuide (Tours/Activities)
+const gyg: Affiliate = {
+  id: "getyourguide",
+  name: "GetYourGuide",
+  category: "tours",
+  description: "Tours, attractions & activities",
+  countries: "ALL",
+  buildUrl: ({ q } = {}) => {
+    const aff = env("NEXT_PUBLIC_GETYOURGUIDE_AFFID", "YOUR_GETYOURGUIDE_ID");
+    let url = `https://www.getyourguide.com/?partner_id=${e(aff)}`;
+    if (q) url += `&q=${e(q)}`;
+    return url;
+  }
+};
 export const AFFILIATES: Affiliate[] = [
   booking,
   agoda,
@@ -277,4 +304,6 @@ export const AFFILIATES: Affiliate[] = [
 export const byCategory = (cat: Category) => AFFILIATES.filter(a => a.category === cat);
 
 export const forCountry = (list: Affiliate[], country: CountryCode) =>
-  list.filter(a => a.countries === "ALL" || a.countries.includes(country));
+  list.filter(
+    (a) => a.countries === "ALL" || (Array.isArray(a.countries) && a.countries.includes(country))
+  );
