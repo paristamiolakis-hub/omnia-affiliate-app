@@ -5,12 +5,12 @@ import CountrySelect from '@/components/CountrySelect';
 import { CountryProvider } from '@/components/CountryContext';
 
 export const metadata = {
-  title: 'Omnia – Super Affiliate Hub',
-  description: 'Hotels, Cars, Flights, Tours, Shops & Finance in one affiliate discovery app.',
+  title: 'Omnia – AI Travel & Shopping Agent',
+  description: 'Tell Omnia what you want to do. Get a structured travel plan, budget map and trusted partner searches in one place.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   openGraph: {
-    title: 'Omnia – Super Affiliate Hub',
-    description: 'Affiliate discovery across travel, shopping and finance.',
+    title: 'Omnia – AI Travel & Shopping Agent',
+    description: 'Plan a complete trip from one natural-language request.',
     type: 'website'
   }
 };

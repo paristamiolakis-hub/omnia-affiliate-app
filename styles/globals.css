@@ -16,10 +16,10 @@ body {
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { border: 0; cursor: pointer; }
 button:disabled { cursor: progress; opacity: .65; }
-input, select {
+input, select, textarea {
   width: 100%;
   padding: 10px 12px;
   background: var(--card);
@@ -27,7 +27,8 @@ input, select {
   border: 1px solid var(--border);
   border-radius: 10px;
 }
-input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+textarea { resize: vertical; line-height: 1.5; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -101,6 +102,94 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .search-action { height: 42px; }
 .suggestion-row { justify-content: space-between; }
 
+.travel-agent { display: grid; gap: 22px; }
+.travel-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(22px, 4vw, 44px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background:
+    radial-gradient(700px circle at 10% 0%, rgba(90,176,255,.18), transparent 45%),
+    radial-gradient(650px circle at 95% 100%, rgba(89,243,164,.12), transparent 45%),
+    #0f1722;
+}
+.travel-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+.travel-hero > * { position: relative; z-index: 1; }
+.eyebrow { color: var(--accent-2); font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.travel-hero h2 { max-width: 760px; margin: 10px 0 12px; font-size: clamp(30px, 5vw, 54px); line-height: 1.02; letter-spacing: -.035em; }
+.travel-hero > p { max-width: 760px; margin: 0; color: var(--muted); font-size: 16px; line-height: 1.6; }
+.travel-prompt-form {
+  margin-top: 24px;
+  padding: 10px;
+  border: 1px solid rgba(90,176,255,.35);
+  border-radius: 16px;
+  background: rgba(7,12,18,.7);
+  box-shadow: 0 20px 70px rgba(0,0,0,.24);
+}
+.travel-prompt-form textarea { min-height: 118px; border: 0; background: transparent; font-size: 17px; }
+.travel-prompt-form textarea:focus-visible { outline-offset: 5px; }
+.travel-prompt-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px 2px; }
+.travel-plan-button { min-width: 150px; text-align: center; }
+.travel-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.example-chip {
+  padding: 7px 10px;
+  color: var(--muted);
+  background: rgba(18,24,33,.72);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  text-align: left;
+  font-size: 12px;
+}
+.example-chip:hover { color: var(--text); border-color: var(--accent); }
+.travel-results { display: grid; gap: 18px; }
+.trip-summary { padding: 22px; }
+.trip-summary:hover, .budget-panel:hover, .planner-notes:hover { transform: none; }
+.trip-summary-top, .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.trip-summary h3 { font-size: clamp(24px, 4vw, 34px); margin: 6px 0; }
+.trip-summary-top p { min-height: 0; }
+.trip-facts, .budget-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.trip-facts > div, .budget-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: rgba(255,255,255,.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.trip-facts span, .budget-grid span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.trip-facts strong, .budget-grid strong { font-size: 16px; }
+.trip-completeness { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+.trip-completeness span { padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.025); }
+.interest-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.budget-panel { padding: 20px; }
+.section-heading h2, .section-heading h3 { margin: 5px 0 0; }
+.budget-panel .section-heading > strong { font-size: 22px; }
+.budget-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.offer-sections { display: grid; gap: 26px; }
+.offer-section { display: grid; gap: 12px; }
+.budget-target { color: var(--muted); font-size: 13px; }
+.travel-offer { display: flex; flex-direction: column; min-height: 220px; }
+.travel-offer .row { margin-top: 0; }
+.offer-rank { color: var(--muted); font-size: 12px; }
+.offer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 18px; }
+.live-price-note { color: var(--muted); font-size: 11px; }
+.planner-notes ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
+.planner-notes li + li { margin-top: 6px; }
+.legacy-search-section { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--border); }
+
 .assistant-toggle { position: fixed; right: 20px; bottom: 20px; z-index: 50; }
 .assistant-panel {
   position: fixed;
@@ -149,6 +238,9 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
   .search-action { grid-column: 1 / -1; width: 100%; }
   .assistant-toggle { right: 14px; bottom: 14px; }
   .assistant-panel { right: 14px; bottom: 64px; }
+  .trip-facts, .budget-grid { grid-template-columns: 1fr 1fr; }
+  .travel-prompt-actions, .offer-footer { align-items: stretch; flex-direction: column; }
+  .travel-plan-button, .offer-footer .button { width: 100%; text-align: center; }
 }
 
 @media (max-width: 460px) {
@@ -158,4 +250,8 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
   .search-grid .field-label:first-child, .flight-search-grid .field-label:first-child, .search-action { grid-column: auto; }
   .suggestion-row { align-items: flex-start; flex-direction: column; }
   .suggestion-row .button { width: 100%; text-align: center; }
+  .trip-facts, .budget-grid { grid-template-columns: 1fr; }
+  .trip-summary-top, .section-heading { flex-direction: column; }
+  .travel-hero { border-radius: 18px; padding: 20px; }
+  .travel-hero h2 { font-size: 34px; }
 }
