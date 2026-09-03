@@ -1,75 +1,100 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useCountry } from '@/components/CountryContext';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
+type Suggestion = { partnerId?: string; title: string; url: string; reason?: string };
 
 export default function OmniaAssistant() {
+  const { country } = useCountry();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('Find a hotel in Heraklion next weekend');
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', content: 'Hello! Ask me for hotels, cars, flights, tours, shops or finance. I will suggest the best links for your country.' }
+    { role: 'assistant', content: 'Ask for hotels, cars, flights, tours, shops or finance. I will route you to configured partners.' }
   ]);
-  const [json, setJson] = useState<any>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
   async function callAI(prompt: string) {
     setLoading(true);
+    setSuggestions([]);
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'user', content: prompt }
-          ]
-        })
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], country })
       });
-      const data = await res.json();
-      setJson(data);
-      const suggestions = (data?.suggestions || []).map((s:any)=>`• ${s.title} → ${s.url}`).join('\n');
-      setMessages(m => [...m, { role:'assistant', content: suggestions || 'No suggestions yet.' }]);
-    } catch (e:any) {
-      setMessages(m => [...m, { role:'assistant', content: 'Error: unable to reach AI endpoint.' }]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Assistant request failed.');
+      const next = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      setSuggestions(next);
+      setMessages(m => [...m, {
+        role: 'assistant',
+        content: next.length ? `I found ${next.length} configured option${next.length === 1 ? '' : 's'}.` : 'No configured partner is available for that request yet.'
+      }]);
+    } catch (e: any) {
+      setMessages(m => [...m, { role: 'assistant', content: String(e?.message || 'Unable to reach the assistant.') }]);
     } finally {
       setLoading(false);
     }
   }
 
   function send() {
-    if (!input.trim()) return;
-    setMessages(m => [...m, { role:'user', content: input }]);
-    void callAI(input);
+    const prompt = input.trim();
+    if (!prompt || loading) return;
+    setMessages(m => [...m, { role: 'user', content: prompt }]);
+    void callAI(prompt);
     setInput('');
   }
 
-  useEffect(()=>{
-    if(ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   }, [messages, open]);
 
   return (
     <>
-      <button
-        onClick={()=>setOpen(v=>!v)}
-        style={{position:'fixed', right:20, bottom:20, zIndex:50}}
-        className="button"
-      >
+      <button onClick={() => setOpen(v => !v)} className="button assistant-toggle" aria-expanded={open} aria-controls="omnia-assistant-panel">
         {open ? 'Close Assistant' : 'Ask Omnia'}
       </button>
       {open && (
-        <div style={{position:'fixed', right:20, bottom:70, width:360, maxHeight:520, display:'flex', flexDirection:'column', gap:8, background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:12, zIndex:49}}>
-          <div ref={ref} style={{overflow:'auto', flex:1, display:'flex', flexDirection:'column', gap:8}}>
-            {messages.map((m,i)=>(
-              <div key={i} style={{alignSelf: m.role==='user'?'flex-end':'flex-start', background:m.role==='user'?'#1f2a38':'#18202b', border:'1px solid var(--border)', padding:'8px 10px', borderRadius:10, maxWidth:'95%'}}>
+        <aside id="omnia-assistant-panel" className="assistant-panel" aria-label="Omnia Assistant">
+          <div ref={ref} className="assistant-messages" aria-live="polite">
+            {messages.map((m, i) => (
+              <div key={i} className={`message-bubble ${m.role === 'user' ? 'message-user' : 'message-assistant'}`}>
                 {m.content}
               </div>
             ))}
+            {suggestions.length > 0 && (
+              <div className="assistant-suggestions">
+                {suggestions.map((s, i) => (
+                  <a
+                    key={`${s.partnerId || s.title}-${i}`}
+                    href={`/api/out?partner=${encodeURIComponent(s.partnerId || s.title)}&url=${encodeURIComponent(s.url)}`}
+                    target="_blank"
+                    rel="nofollow sponsored noopener"
+                    className="assistant-suggestion"
+                  >
+                    <strong>{s.title}</strong>
+                    <span>{s.reason}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
-          <div style={{display:'flex', gap:6}}>
-            <input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask e.g. hotels in Athens" style={{flex:1, padding:'10px 12px', background:'var(--card)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10}}/>
-            <button onClick={send} className="button" disabled={loading}>{loading?'…':'Send'}</button>
+          <div className="assistant-input-row">
+            <label className="sr-only" htmlFor="omnia-assistant-input">Ask Omnia</label>
+            <input
+              id="omnia-assistant-input"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') send(); }}
+              maxLength={1200}
+              placeholder="Ask e.g. hotels in Athens"
+            />
+            <button onClick={send} className="button" disabled={loading}>{loading ? '…' : 'Send'}</button>
           </div>
-        </div>
+        </aside>
       )}
     </>
   );
