@@ -5,25 +5,34 @@ import { byCategory, forCountry } from '@/lib/affiliates';
 import { useCountry } from '@/components/CountryContext';
 import { useState } from 'react';
 
-function toISO(d: Date) { return d.toISOString().slice(0,10); }
-const today = new Date();
-const nextWeek = new Date(Date.now() + 7*24*60*60*1000);
+function toLocalISO(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function initialDates() {
+  const today = new Date();
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 7);
+  return { today: toLocalISO(today), nextWeek: toLocalISO(nextWeek) };
+}
 
 export default function Page() {
   const { country } = useCountry();
+  const initial = initialDates();
   const [origin, setOrigin] = useState('ATH');
   const [dest, setDest] = useState('LHR');
-  const [depart, setDepart] = useState(toISO(today));
-  const [ret, setRet] = useState(toISO(nextWeek));
-
+  const [depart, setDepart] = useState(initial.today);
+  const [ret, setRet] = useState(initial.nextWeek);
   const items = forCountry(byCategory('flights'), country);
 
-  function normalizeDates(nextDepart?: string) {
-    const d = nextDepart ?? depart;
-    if (ret <= d) {
-      const n = new Date(d);
+  function normalizeDates(nextDepart: string) {
+    if (ret <= nextDepart) {
+      const n = new Date(`${nextDepart}T12:00:00`);
       n.setDate(n.getDate() + 3);
-      setRet(toISO(n));
+      setRet(toLocalISO(n));
     }
   }
 
@@ -31,42 +40,31 @@ export default function Page() {
 
   return (
     <main>
-      <div className="helper">
-        Country filter: <b>{country}</b> • Change with the selector on the top-right.
-      </div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'0.5fr 0.5fr 0.8fr 0.8fr auto', gap:8, margin:'6px 0 16px' }}>
-        <input
-          value={origin}
-          onChange={e => setOrigin(e.target.value.toUpperCase().slice(0,3))}
-          placeholder="Origin IATA (e.g. ATH)"
-          style={{ padding:'10px 12px', background:'var(--card)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10 }}
-        />
-        <input
-          value={dest}
-          onChange={e => setDest(e.target.value.toUpperCase().slice(0,3))}
-          placeholder="Dest IATA (e.g. LHR)"
-          style={{ padding:'10px 12px', background:'var(--card)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10 }}
-        />
-        <input
-          type="date"
-          value={depart}
-          onChange={e => { setDepart(e.target.value); normalizeDates(e.target.value); }}
-          style={{ padding:'10px 12px', background:'var(--card)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10 }}
-        />
-        <input
-          type="date"
-          value={ret}
-          onChange={e => setRet(e.target.value)}
-          style={{ padding:'10px 12px', background:'var(--card)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10 }}
-        />
-        <button onClick={()=>{}} className="button">Apply</button>
+      <div className="helper">Country filter: <b>{country}</b> • Enter 3-letter IATA airport codes.</div>
+      <div className="search-grid" style={{ marginBottom: 16, gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))' }}>
+        <label className="field-label">
+          Origin
+          <input value={origin} onChange={e => setOrigin(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))} placeholder="ATH" maxLength={3} />
+        </label>
+        <label className="field-label">
+          Destination
+          <input value={dest} onChange={e => setDest(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))} placeholder="LHR" maxLength={3} />
+        </label>
+        <label className="field-label">
+          Depart
+          <input type="date" value={depart} onChange={e => { setDepart(e.target.value); normalizeDates(e.target.value); }} />
+        </label>
+        <label className="field-label">
+          Return
+          <input type="date" min={depart} value={ret} onChange={e => setRet(e.target.value)} />
+        </label>
       </div>
 
       <div className="grid">
         {items.map(a => (
           <AffiliateCard
             key={a.id}
+            partnerId={a.id}
             title={a.name}
             description={a.description}
             href={a.buildUrl({ q, country, checkin: depart, checkout: ret })}
@@ -74,7 +72,6 @@ export default function Page() {
           />
         ))}
       </div>
-
       <OmniaAssistant />
     </main>
   );
