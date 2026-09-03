@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { byCategory, forCountry } from "../../../lib/affiliates";
-import { normalizeCountry, type Intent } from "../../../lib/smart";
+import {
+  extractDestination,
+  normalizeCountry,
+  parseDatesFromQuery,
+  parseFlights,
+  type Intent
+} from "../../../lib/smart";
 
 export const runtime = "edge";
 
@@ -14,19 +20,15 @@ function safeIntent(value: unknown): Intent {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const rawMessages = Array.isArray(body?.messages) ? body.messages : [];
-  const latestUser = [...rawMessages]
-    .reverse()
-    .find((m: any) => m?.role === "user" && typeof m?.content === "string");
+  const latestUser = [...rawMessages].reverse().find(
+    (m: any) => m?.role === "user" && typeof m?.content === "string"
+  );
   const prompt = String(latestUser?.content || "").trim().slice(0, MAX_INPUT_CHARS);
 
-  if (!prompt) {
-    return NextResponse.json({ error: "A user message is required." }, { status: 400 });
-  }
+  if (!prompt) return NextResponse.json({ error: "A user message is required." }, { status: 400 });
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "AI assistant is not configured." }, { status: 503 });
-  }
+  if (!apiKey) return NextResponse.json({ error: "AI assistant is not configured." }, { status: 503 });
 
   const country = normalizeCountry(body?.country || "GR");
   const payload = {
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
       {
         role: "system",
         content:
-          "Classify the request for an affiliate search. Return JSON only with fields intent and query. intent must be one of: hotels, cars, flights, tours, shops, finance. Never return URLs, HTML, markdown, credentials, or instructions. query should preserve the useful destination/product/route text from the user request."
+          "Classify the request for an affiliate search. Return JSON only with fields intent and query. intent must be one of: hotels, cars, flights, tours, shops, finance. Never return URLs, HTML, markdown, credentials, or instructions. query should preserve useful destination, product, route and date text from the user request."
       },
       { role: "user", content: prompt }
     ],
@@ -46,10 +48,7 @@ export async function POST(req: NextRequest) {
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(payload)
   });
 
@@ -69,12 +68,30 @@ export async function POST(req: NextRequest) {
 
   const intent = safeIntent(parsed?.intent);
   const query = String(parsed?.query || prompt).slice(0, MAX_INPUT_CHARS);
-  const partners = forCountry(byCategory(intent), country).slice(0, 3);
-  const suggestions = partners.map((partner) => ({
-    title: partner.name,
-    url: partner.buildUrl({ q: query, country }),
-    reason: `${partner.name} is available for ${country}.`
-  }));
+  const parsedDates = parseDatesFromQuery(query);
+  const destination = ["hotels", "cars", "tours"].includes(intent) ? extractDestination(query) : query;
+  const flight = intent === "flights" ? parseFlights(query) : {};
+
+  const suggestions = forCountry(byCategory(intent), country)
+    .map((partner) => {
+      const q = intent === "flights" && flight.origin && flight.destination
+        ? `${flight.origin}-${flight.destination}`
+        : destination;
+      const url = partner.buildUrl({
+        q,
+        country,
+        checkin: flight.depart || parsedDates.checkin,
+        checkout: flight.ret || parsedDates.checkout
+      });
+      return {
+        partnerId: partner.id,
+        title: partner.name,
+        url,
+        reason: `${partner.name} is available for ${country}.`
+      };
+    })
+    .filter((suggestion) => Boolean(suggestion.url))
+    .slice(0, 3);
 
   return NextResponse.json({ intent, query, country, suggestions });
 }
