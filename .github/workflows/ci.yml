@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        env:
+          OPENAI_API_KEY: test-key
+          NEXT_PUBLIC_BOOKING_AID: test
+          NEXT_PUBLIC_AGODA_AFFID: test
+          NEXT_PUBLIC_HOTELSCOM_PID: test
+          NEXT_PUBLIC_RENTALCARS_CODE: test
+          NEXT_PUBLIC_SKYSCANNER_PID: test
+          NEXT_PUBLIC_GETYOURGUIDE_AFFID: test
+          NEXT_PUBLIC_AMAZON_TAG: test-21
+          NEXT_PUBLIC_REVOLUT_CAMPAIGN_ID: test
+        run: npm run build
