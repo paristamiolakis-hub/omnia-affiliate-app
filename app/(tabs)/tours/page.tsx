@@ -12,20 +12,16 @@ export default function Page() {
 
   return (
     <main>
-      <div className="helper">Country filter: <b>{country}</b> • Change with the selector on the top-right.</div>
-      <div style={{ display:'flex', gap:8, margin:'6px 0 16px' }}>
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search tours or attractions…"
-          style={{ flex:1, padding:'10px 12px', background:'var(--card)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10 }}
-        />
-        <button onClick={()=>{}} className="button">Apply</button>
-      </div>
+      <div className="helper">Country filter: <b>{country}</b> • Results update as you type.</div>
+      <label className="field-label" style={{ margin: '6px 0 16px' }}>
+        Destination or attraction
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tours or attractions…" maxLength={200} />
+      </label>
       <div className="grid">
         {items.map(a => (
           <AffiliateCard
             key={a.id}
+            partnerId={a.id}
             title={a.name}
             description={a.description}
             href={a.buildUrl({ q: query || undefined, country })}
