@@ -87,6 +87,7 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .helper { margin: 16px 0 8px; color: var(--muted); font-size: 13px; }
 .error-text { color: #ffabab; }
 .footer { margin-top: 32px; color: var(--muted); font-size: 12px; text-align: center; border-top: 1px dashed var(--border); padding: 12px 0; }
+.footer a { color: var(--muted); }
 
 .search-grid {
   display: grid;
@@ -95,6 +96,7 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
   margin-top: 12px;
   align-items: end;
 }
+.flight-search-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
 .field-label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 .search-action { height: 42px; }
 .suggestion-row { justify-content: space-between; }
@@ -141,8 +143,9 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
   .header { align-items: flex-start; }
   .nav { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
   .tab { flex: 0 0 auto; }
-  .search-grid { grid-template-columns: 1fr 1fr; }
-  .search-grid .field-label:first-child { grid-column: 1 / -1; }
+  .search-grid, .flight-search-grid { grid-template-columns: 1fr 1fr; }
+  .search-grid .field-label:first-child:not(:only-child) { grid-column: 1 / -1; }
+  .flight-search-grid .field-label:first-child { grid-column: auto; }
   .search-action { grid-column: 1 / -1; width: 100%; }
   .assistant-toggle { right: 14px; bottom: 14px; }
   .assistant-panel { right: 14px; bottom: 64px; }
@@ -151,8 +154,8 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 @media (max-width: 460px) {
   .header { flex-direction: column; }
   .country-select { width: 100%; }
-  .search-grid { grid-template-columns: 1fr; }
-  .search-grid .field-label:first-child, .search-action { grid-column: auto; }
+  .search-grid, .flight-search-grid { grid-template-columns: 1fr; }
+  .search-grid .field-label:first-child, .flight-search-grid .field-label:first-child, .search-action { grid-column: auto; }
   .suggestion-row { align-items: flex-start; flex-direction: column; }
   .suggestion-row .button { width: 100%; text-align: center; }
 }
