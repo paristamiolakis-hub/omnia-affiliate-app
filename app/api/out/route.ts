@@ -31,9 +31,14 @@ function allowedHost(hostname: string) {
   return ALLOWED_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
 }
 
+function safeDimension(value: string | null, fallback: string) {
+  return (value || fallback).replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 64) || fallback;
+}
+
 export async function GET(req: NextRequest) {
   const rawUrl = req.nextUrl.searchParams.get("url") || "";
-  const partner = (req.nextUrl.searchParams.get("partner") || "unknown").slice(0, 64);
+  const partner = safeDimension(req.nextUrl.searchParams.get("partner"), "unknown");
+  const source = safeDimension(req.nextUrl.searchParams.get("source"), "direct");
   let destination: URL;
 
   try {
@@ -49,8 +54,9 @@ export async function GET(req: NextRequest) {
   console.log(JSON.stringify({
     event: "omnia.affiliate_click",
     partner,
+    source,
     host: destination.hostname,
-    path: req.nextUrl.pathname,
+    path: destination.pathname.slice(0, 180),
     ts: new Date().toISOString()
   }));
 
