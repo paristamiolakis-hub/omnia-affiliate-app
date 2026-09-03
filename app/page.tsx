@@ -1,27 +1,23 @@
-import Link from 'next/link';
-
+import TravelPlanner from '@/components/TravelPlanner';
 import SmartSearch from '@/components/SmartSearch';
 import OmniaAssistant from '@/components/OmniaAssistant';
 
 export default function Page() {
   return (
     <main>
-      <SmartSearch />
-      <div className="card" style={{marginBottom:16}}>
-        <h3>Welcome to Omnia</h3>
-        <p>
-          Start earning with quick affiliate integrations across travel, shopping, finance and more.
-          Pick a tab above, choose a country, and click through to partner sites using your affiliate IDs.
-        </p>
-        <div className="helper">
-          Tip: Rename the app and update links in <code>/lib/affiliates.ts</code>. Fill your IDs in <code>.env.local</code>.
+      <TravelPlanner />
+
+      <section className="legacy-search-section" aria-labelledby="quick-search-title">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">QUICK SEARCH</span>
+            <h2 id="quick-search-title">Prefer the old one-step search?</h2>
+          </div>
         </div>
-        <div className="row">
-          <span className="badge">MVP</span>
-          <Link href="/hotels" className="button">Go to Hotels</Link>
-        </div>
-      </div>
-          <OmniaAssistant />
+        <SmartSearch />
+      </section>
+
+      <OmniaAssistant />
     </main>
   );
 }
