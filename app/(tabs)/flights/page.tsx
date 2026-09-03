@@ -41,7 +41,7 @@ export default function Page() {
   return (
     <main>
       <div className="helper">Country filter: <b>{country}</b> • Enter 3-letter IATA airport codes.</div>
-      <div className="search-grid" style={{ marginBottom: 16, gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))' }}>
+      <div className="search-grid flight-search-grid" style={{ marginBottom: 16 }}>
         <label className="field-label">
           Origin
           <input value={origin} onChange={e => setOrigin(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))} placeholder="ATH" maxLength={3} />
