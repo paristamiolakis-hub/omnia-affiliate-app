@@ -3,36 +3,52 @@ import {
   buildFallbackIntent,
   buildTripResult,
   mergeStructuredIntent,
-  resolveAirport,
   type TripIntent
 } from "../../../../lib/travel";
+import { destinationsMentioned, resolveDestination } from "../../../../lib/destinations";
+import { addTravelIntelligence } from "../../../../lib/travel-intelligence";
 
 export const runtime = "edge";
 
 const MAX_INPUT_CHARS = 1800;
 
-function normalizeFallbackDirection(prompt: string, fallback: TripIntent): TripIntent {
+function enrichLocations(prompt: string, input: TripIntent): TripIntent {
+  let plan = { ...input };
+  const mentioned = destinationsMentioned(prompt);
   const fromMatch = prompt.match(/(?:\bfrom\b|\bαπό\b|\bαπο\b)\s+([^,.;]+)/i);
-  if (!fromMatch?.[1]) return fallback;
+  const explicitOrigin = fromMatch?.[1] ? resolveDestination(fromMatch[1]) : undefined;
+  const normalizedOrigin = resolveDestination(plan.origin);
+  const normalizedDestination = resolveDestination(plan.destination);
 
-  const explicitOrigin = resolveAirport(fromMatch[1]);
-  if (!explicitOrigin) return fallback;
-
-  if (fallback.destinationIata === explicitOrigin.iata && fallback.origin && fallback.originIata) {
-    return {
-      ...fallback,
-      origin: explicitOrigin.city,
-      originIata: explicitOrigin.iata,
-      destination: fallback.origin,
-      destinationIata: fallback.originIata
-    };
+  if (normalizedOrigin) {
+    plan.origin = normalizedOrigin.city;
+    plan.originIata = normalizedOrigin.flightCode;
+  }
+  if (normalizedDestination) {
+    plan.destination = normalizedDestination.city;
+    plan.destinationIata = normalizedDestination.flightCode;
   }
 
-  return {
-    ...fallback,
-    origin: explicitOrigin.city,
-    originIata: explicitOrigin.iata
-  };
+  if (explicitOrigin) {
+    plan.origin = explicitOrigin.city;
+    plan.originIata = explicitOrigin.flightCode;
+  }
+
+  const originCode = plan.originIata;
+  const candidateDestination = mentioned.find((destination) => destination.flightCode !== originCode);
+  const destinationMatchesOrigin = Boolean(originCode && plan.destinationIata === originCode);
+
+  if ((!plan.destination || destinationMatchesOrigin) && candidateDestination) {
+    plan.destination = candidateDestination.city;
+    plan.destinationIata = candidateDestination.flightCode;
+  }
+
+  if (!plan.destination && mentioned[0]) {
+    plan.destination = mentioned[0].city;
+    plan.destinationIata = mentioned[0].flightCode;
+  }
+
+  return plan;
 }
 
 async function classifyWithAI(prompt: string, base: TripIntent) {
@@ -103,16 +119,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Describe the trip you want Omnia to plan." }, { status: 400 });
   }
 
-  const fallback = normalizeFallbackDirection(prompt, buildFallbackIntent(prompt, country));
+  const fallback = enrichLocations(prompt, buildFallbackIntent(prompt, country));
   const ai = await classifyWithAI(prompt, fallback);
-  const plan = ai ? mergeStructuredIntent(fallback, ai) : fallback;
-  const result = buildTripResult(plan, country, ai ? "ai" : "fallback");
+  const plan = enrichLocations(prompt, ai ? mergeStructuredIntent(fallback, ai) : fallback);
+  const baseResult = buildTripResult(plan, country, ai ? "ai" : "fallback");
+  const result = addTravelIntelligence(baseResult);
 
   console.log(JSON.stringify({
     event: "omnia.travel.plan",
     generatedBy: result.generatedBy,
     destination: result.plan.destination || null,
     needs: result.plan.needs,
+    readinessScore: result.intelligence.readinessScore,
     hasBudget: Boolean(result.plan.budget),
     hasDates: Boolean(result.plan.checkin && result.plan.checkout),
     ts: new Date().toISOString()
