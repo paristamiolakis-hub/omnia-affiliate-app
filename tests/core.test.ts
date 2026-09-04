@@ -85,11 +85,12 @@ test('current partner registry never claims live pricing or availability', () =>
 });
 
 test('partner configuration status exposes missing key names but no secret values', () => {
-  const empty = partnerConfigStatus('booking', {} as NodeJS.ProcessEnv);
+  const empty = partnerConfigStatus('booking', {} as unknown as NodeJS.ProcessEnv);
   assert.equal(empty.configured, false);
   assert.deepEqual(empty.missing, ['NEXT_PUBLIC_BOOKING_AID']);
 
-  const configured = partnerConfigStatus('booking', { NEXT_PUBLIC_BOOKING_AID: 'secret-value' } as NodeJS.ProcessEnv);
+  const configuredEnv = { NODE_ENV: 'test', NEXT_PUBLIC_BOOKING_AID: 'secret-value' } as NodeJS.ProcessEnv;
+  const configured = partnerConfigStatus('booking', configuredEnv);
   assert.equal(configured.configured, true);
   assert.deepEqual(configured.missing, []);
   assert.equal(JSON.stringify(configured).includes('secret-value'), false);
