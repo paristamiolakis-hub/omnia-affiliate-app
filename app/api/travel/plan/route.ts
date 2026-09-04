@@ -8,6 +8,7 @@ import {
 import { destinationsMentioned, resolveDestination } from "../../../../lib/destinations";
 import { addTravelIntelligence } from "../../../../lib/travel-intelligence";
 import { addDecisionSupport } from "../../../../lib/decision-engine";
+import { addHumanNeeds } from "../../../../lib/human-needs";
 
 export const runtime = "edge";
 
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const prompt = String(body?.query || "").trim().slice(0, MAX_INPUT_CHARS);
   const country = String(body?.country || "GR").slice(0, 8);
+  const priority = body?.priority;
 
   if (!prompt) {
     return NextResponse.json({ error: "Describe the trip you want Omnia to plan." }, { status: 400 });
@@ -125,7 +127,8 @@ export async function POST(req: NextRequest) {
   const plan = enrichLocations(prompt, ai ? mergeStructuredIntent(fallback, ai) : fallback);
   const baseResult = buildTripResult(plan, country, ai ? "ai" : "fallback");
   const intelligentResult = addTravelIntelligence(baseResult);
-  const result = addDecisionSupport(intelligentResult);
+  const decisionResult = addDecisionSupport(intelligentResult);
+  const result = addHumanNeeds(decisionResult, priority);
 
   console.log(JSON.stringify({
     event: "omnia.travel.plan",
@@ -133,6 +136,7 @@ export async function POST(req: NextRequest) {
     destination: result.plan.destination || null,
     needs: result.plan.needs,
     readinessScore: result.intelligence.readinessScore,
+    priority: result.humanNeeds.priority,
     itineraryDays: result.decisionSupport.itinerary.days.length,
     hasBudgetOptimizer: Boolean(result.decisionSupport.budgetOptimizer),
     hasBudget: Boolean(result.plan.budget),
