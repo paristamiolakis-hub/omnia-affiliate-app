@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useCountry } from '@/components/CountryContext';
 import { omniaStorage } from '@/lib/storage';
-import type { TripPlanResult, TravelCategory } from '@/lib/travel';
+import type { TripPlanResult, TravelCategory, TravelOffer } from '@/lib/travel';
+import type { IntelligentTripPlanResult, RankedTravelOffer } from '@/lib/travel-intelligence';
 
 const EXAMPLES = [
   'Rome 12-16 October for 2 people, budget €1200, from Athens',
@@ -18,6 +20,10 @@ const LABELS: Record<TravelCategory, string> = {
   cars: 'Car rental'
 };
 
+type PlannerResult = TripPlanResult | IntelligentTripPlanResult;
+
+type DisplayOffer = TravelOffer | RankedTravelOffer;
+
 function money(value: number | undefined, currency: string) {
   if (value == null) return 'Not set';
   try {
@@ -31,6 +37,14 @@ function statusLabel(value: boolean, yes: string, no: string) {
   return value ? `✓ ${yes}` : `○ ${no}`;
 }
 
+function hasIntelligence(result: PlannerResult): result is IntelligentTripPlanResult {
+  return 'intelligence' in result && Boolean(result.intelligence);
+}
+
+function hasFitScore(offer: DisplayOffer): offer is RankedTravelOffer {
+  return 'fitScore' in offer && typeof offer.fitScore === 'number';
+}
+
 export default function TravelPlanner() {
   const { country } = useCountry();
   const [query, setQuery] = useState(EXAMPLES[0]);
@@ -38,7 +52,7 @@ export default function TravelPlanner() {
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
   const [error, setError] = useState('');
-  const [result, setResult] = useState<TripPlanResult | null>(null);
+  const [result, setResult] = useState<PlannerResult | null>(null);
   const [activeTripId, setActiveTripId] = useState<string | undefined>();
 
   useEffect(() => {
@@ -72,7 +86,7 @@ export default function TravelPlanner() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || 'Could not build this trip.');
-      const nextResult = data as TripPlanResult;
+      const nextResult = data as IntelligentTripPlanResult;
       setResult(nextResult);
       await omniaStorage.recordEvent({
         name: 'trip_search',
@@ -116,6 +130,8 @@ export default function TravelPlanner() {
     return (['flights', 'hotels', 'tours', 'cars'] as TravelCategory[])
       .filter((category) => result.plan.needs.includes(category));
   }, [result]);
+
+  const intelligence = result && hasIntelligence(result) ? result.intelligence : undefined;
 
   return (
     <section className="travel-agent" aria-labelledby="travel-agent-title">
@@ -175,6 +191,18 @@ export default function TravelPlanner() {
             </div>
             {savedMessage && <p className="save-message">{savedMessage}</p>}
 
+            {intelligence && (
+              <div className="readiness-panel">
+                <div className="readiness-copy">
+                  <span>Trip readiness</span>
+                  <strong>{intelligence.readinessScore}/100 · {intelligence.readinessLabel}</strong>
+                </div>
+                <div className="readiness-track" aria-label={`Trip readiness ${intelligence.readinessScore} out of 100`}>
+                  <span style={{ width: `${intelligence.readinessScore}%` }} />
+                </div>
+              </div>
+            )}
+
             <div className="trip-facts">
               <div><span>Travellers</span><strong>{result.plan.travelers}</strong></div>
               <div><span>Style</span><strong>{result.plan.style}</strong></div>
@@ -195,6 +223,28 @@ export default function TravelPlanner() {
               </div>
             )}
           </div>
+
+          {intelligence?.destination && (
+            <div className="destination-insight card">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">DESTINATION INTELLIGENCE</span>
+                  <h3>{intelligence.destination.city}, {intelligence.destination.country}</h3>
+                </div>
+                <Link className="button secondary-button" href={`/destinations/${intelligence.destination.slug}`}>Destination guide</Link>
+              </div>
+              <p>{intelligence.destination.summary}</p>
+              <div className="destination-meta">
+                <span>{intelligence.nights ? `${intelligence.nights} nights` : 'Dates not set'}</span>
+                {intelligence.durationLabel && <span>{intelligence.durationLabel}</span>}
+                <span>Suggested {intelligence.destination.suggestedDays.min}-{intelligence.destination.suggestedDays.max} days</span>
+                <span>{intelligence.destination.carUseful ? 'Car can be useful' : 'Usually easy without a car'}</span>
+              </div>
+              <div className="interest-row">
+                {intelligence.destination.highlights.map((highlight) => <span className="badge" key={highlight}>{highlight}</span>)}
+              </div>
+            </div>
+          )}
 
           {result.budget && (
             <div className="budget-panel card">
@@ -238,7 +288,18 @@ export default function TravelPlanner() {
                         <span className="offer-rank">#{offer.rank}</span>
                       </div>
                       <h3>{offer.title}</h3>
+                      {hasFitScore(offer) && (
+                        <div className="fit-score-row">
+                          <strong>{offer.fitScore}/100 fit</strong>
+                          <span>Omnia ranking, not a live-price score</span>
+                        </div>
+                      )}
                       <p>{offer.description}</p>
+                      {hasFitScore(offer) && offer.fitReasons.length > 0 && (
+                        <div className="fit-reasons">
+                          {offer.fitReasons.map((reason) => <span key={reason}>{reason}</span>)}
+                        </div>
+                      )}
                       <div className="offer-footer">
                         <span className="live-price-note">Price checked on partner</span>
                         {offer.trackedUrl ? (
@@ -262,7 +323,15 @@ export default function TravelPlanner() {
             ))}
           </div>
 
-          {result.warnings.length > 0 && (
+          {intelligence && intelligence.nextBestActions.length > 0 && (
+            <div className="planner-notes card">
+              <span className="eyebrow">NEXT BEST ACTIONS</span>
+              <h3>Make this trip more decision-ready</h3>
+              <ul>{intelligence.nextBestActions.map((action) => <li key={action}>{action}</li>)}</ul>
+            </div>
+          )}
+
+          {!intelligence && result.warnings.length > 0 && (
             <div className="planner-notes card">
               <h3>Improve this plan</h3>
               <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
