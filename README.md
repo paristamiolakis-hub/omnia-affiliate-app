@@ -1,6 +1,6 @@
 # Omnia – AI Travel & Shopping Agent
 
-Omnia is a Next.js affiliate decision engine for travel, shopping and finance. The home experience now starts with a natural-language travel planner that turns one request into a structured trip, budget allocation and partner searches.
+Omnia is a Next.js affiliate decision engine for travel, shopping and finance. The home experience starts with a natural-language travel planner that turns one request into a structured trip, budget allocation and partner searches.
 
 ## Travel Agent v1
 
@@ -14,6 +14,23 @@ Omnia is a Next.js affiliate decision engine for travel, shopping and finance. T
 - warnings when important trip details are missing.
 
 The AI layer is intentionally limited to extracting structured trip intent. It cannot invent affiliate URLs or live prices. If OpenAI is unavailable or not configured, Omnia falls back to deterministic parsing.
+
+## Local-first platform foundation
+
+Omnia currently does not require a dedicated database or application server beyond the existing Next.js deployment.
+
+The browser storage adapter in `lib/storage.ts` provides:
+
+- saved trips on the current device;
+- reopening saved trips from `/my-trips`;
+- local trip-search analytics;
+- affiliate-click attribution by partner;
+- a local analytics dashboard at `/analytics`;
+- JSON export for later migration to a persistent backend.
+
+The UI talks to the `OmniaStorageAdapter` interface rather than directly depending on a database vendor. A future Supabase, Neon, Postgres, Firebase or other backend can replace the adapter without rewriting the Travel Agent product flow.
+
+Local storage is device/browser scoped. Clearing browser data removes saved trips and analytics, and data is not shared between devices.
 
 ## Local setup
 
@@ -33,7 +50,7 @@ Affiliate URL templates live in `lib/affiliates.ts`. UI click-outs pass through 
 - emits a structured `omnia.affiliate_click` event with partner and source attribution;
 - uses `rel="nofollow sponsored noopener"` on outbound UI links.
 
-For full revenue/conversion attribution, connect partner postbacks/webhooks or affiliate-network reporting APIs to a persistent analytics store. The repository currently records outbound click events but cannot infer a completed third-party purchase on its own.
+The browser also records a local affiliate-click event for product analytics. Full revenue/conversion attribution still requires partner postbacks/webhooks or reporting APIs plus persistent storage.
 
 ## AI Assistant
 
@@ -53,6 +70,6 @@ GitHub Actions runs typecheck and production build on pull requests and pushes t
 
 ## Next platform milestones
 
-Travel Agent v1 is the orchestration layer. Live comparison pricing requires approved partner APIs/feeds. Persistent searches, saved trips, conversion/revenue reporting and an admin dashboard require a database and partner postbacks/reporting integrations.
+The next backend-dependent stage is persistent cross-device accounts/trips, conversion and commission ingestion, revenue attribution and an admin business dashboard. Live comparison pricing also requires approved partner APIs or feeds.
 
-Before launch, configure a real `NEXT_PUBLIC_SITE_URL`, review partner deeplink requirements against your current affiliate agreements, and connect persistent analytics/conversion reporting if revenue attribution is required.
+Before launch, configure a real `NEXT_PUBLIC_SITE_URL` and review partner deeplink requirements against your current affiliate agreements.

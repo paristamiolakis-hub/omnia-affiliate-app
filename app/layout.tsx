@@ -1,4 +1,5 @@
 import '../styles/globals.css';
+import '../styles/platform.css';
 import Link from 'next/link';
 import NavTabs from '@/components/NavTabs';
 import CountrySelect from '@/components/CountrySelect';
