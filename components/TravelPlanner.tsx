@@ -6,6 +6,7 @@ import { useCountry } from '@/components/CountryContext';
 import { omniaStorage } from '@/lib/storage';
 import type { TripPlanResult, TravelCategory, TravelOffer } from '@/lib/travel';
 import type { IntelligentTripPlanResult, RankedTravelOffer } from '@/lib/travel-intelligence';
+import type { DecisionTripPlanResult } from '@/lib/decision-engine';
 
 const EXAMPLES = [
   'Rome 12-16 October for 2 people, budget €1200, from Athens',
@@ -20,7 +21,7 @@ const LABELS: Record<TravelCategory, string> = {
   cars: 'Car rental'
 };
 
-type PlannerResult = TripPlanResult | IntelligentTripPlanResult;
+type PlannerResult = TripPlanResult | IntelligentTripPlanResult | DecisionTripPlanResult;
 type DisplayOffer = TravelOffer | RankedTravelOffer;
 
 function money(value: number | undefined, currency: string) {
@@ -36,8 +37,12 @@ function statusLabel(value: boolean, yes: string, no: string) {
   return value ? `✓ ${yes}` : `○ ${no}`;
 }
 
-function hasIntelligence(result: PlannerResult): result is IntelligentTripPlanResult {
+function hasIntelligence(result: PlannerResult): result is IntelligentTripPlanResult | DecisionTripPlanResult {
   return 'intelligence' in result && Boolean(result.intelligence);
+}
+
+function hasDecisionSupport(result: PlannerResult): result is DecisionTripPlanResult {
+  return 'decisionSupport' in result && Boolean(result.decisionSupport);
 }
 
 function hasFitScore(offer: DisplayOffer): offer is RankedTravelOffer {
@@ -90,7 +95,7 @@ export default function TravelPlanner() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || 'Could not build this trip.');
-      const nextResult = data as IntelligentTripPlanResult;
+      const nextResult = data as DecisionTripPlanResult;
       setResult(nextResult);
       await omniaStorage.recordEvent({
         name: 'trip_search',
@@ -136,6 +141,7 @@ export default function TravelPlanner() {
   }, [result]);
 
   const intelligence = result && hasIntelligence(result) ? result.intelligence : undefined;
+  const decisions = result && hasDecisionSupport(result) ? result.decisionSupport : undefined;
 
   return (
     <section className="travel-agent" aria-labelledby="travel-agent-title">
@@ -143,7 +149,7 @@ export default function TravelPlanner() {
         <span className="eyebrow">OMNIA TRAVEL AGENT</span>
         <h2 id="travel-agent-title">Tell Omnia the trip. Get one complete plan.</h2>
         <p>
-          Describe where you want to go, when, who is travelling and your budget. Omnia turns it into a structured plan and prepares the right partner searches.
+          Describe where you want to go, when, who is travelling and your budget. Omnia turns it into a structured plan, decision support and the right partner searches.
         </p>
 
         <form onSubmit={submit} className="travel-prompt-form">
@@ -250,6 +256,40 @@ export default function TravelPlanner() {
             </div>
           )}
 
+          {decisions?.itinerary.days.length ? (
+            <section className="decision-section">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">DAY-BY-DAY</span>
+                  <h3>Flexible itinerary</h3>
+                </div>
+                <span className="budget-target">{decisions.itinerary.days.length} planned days</span>
+              </div>
+              <div className="itinerary-grid">
+                {decisions.itinerary.days.map((day) => (
+                  <article className="card itinerary-day" key={day.day}>
+                    <div className="itinerary-day-head">
+                      <span className="badge">Day {day.day}</span>
+                      {day.date && <span className="offer-rank">{day.date}</span>}
+                    </div>
+                    <h3>{day.title}</h3>
+                    <span className="itinerary-focus">Focus: {day.focus}</span>
+                    <div className="itinerary-blocks">
+                      {day.blocks.map((block) => (
+                        <div key={block.period}>
+                          <strong>{block.period} · {block.title}</strong>
+                          <p>{block.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {decisions.itinerary.coverageNote && <p className="helper">{decisions.itinerary.coverageNote}</p>}
+              <p className="helper">{decisions.itinerary.disclaimer}</p>
+            </section>
+          ) : null}
+
           {result.budget && (
             <div className="budget-panel card">
               <div className="section-heading">
@@ -269,6 +309,84 @@ export default function TravelPlanner() {
               <p className="helper">These are planning targets, not live partner prices.</p>
             </div>
           )}
+
+          {decisions?.budgetOptimizer && (
+            <section className="decision-section card budget-optimizer">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">BUDGET OPTIMIZER</span>
+                  <h3>Rebalance the same total budget</h3>
+                </div>
+                <strong>{money(decisions.budgetOptimizer.total, decisions.budgetOptimizer.currency)}</strong>
+              </div>
+              <div className="optimizer-kpis">
+                <div><span>Per person</span><strong>{money(decisions.budgetOptimizer.perPerson, decisions.budgetOptimizer.currency)}</strong></div>
+                <div><span>Per night</span><strong>{money(decisions.budgetOptimizer.perNight, decisions.budgetOptimizer.currency)}</strong></div>
+                <div><span>Per person / night</span><strong>{money(decisions.budgetOptimizer.perPersonPerNight, decisions.budgetOptimizer.currency)}</strong></div>
+              </div>
+              <div className="optimizer-table" role="table" aria-label="Budget allocation comparison">
+                <div className="optimizer-row optimizer-header" role="row">
+                  <span>Category</span><span>Current</span><span>Optimized</span><span>Move</span>
+                </div>
+                {decisions.budgetOptimizer.movements.map((movement) => (
+                  <div className="optimizer-row" role="row" key={movement.category}>
+                    <strong>{movement.category === 'tours' ? 'Activities' : movement.category === 'cars' ? 'Car' : movement.category}</strong>
+                    <span>{money(movement.current, decisions.budgetOptimizer!.currency)}</span>
+                    <span>{money(movement.recommended, decisions.budgetOptimizer!.currency)}</span>
+                    <span className={movement.delta > 0 ? 'delta-up' : movement.delta < 0 ? 'delta-down' : ''}>
+                      {movement.delta > 0 ? '+' : ''}{money(movement.delta, decisions.budgetOptimizer!.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {decisions.budgetOptimizer.recommendations.length > 0 && (
+                <ul className="optimizer-notes">
+                  {decisions.budgetOptimizer.recommendations.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              )}
+              <p className="helper">{decisions.budgetOptimizer.disclaimer}</p>
+            </section>
+          )}
+
+          {decisions?.comparisons.length ? (
+            <section className="decision-section">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">COMPARISON MATRIX</span>
+                  <h3>Compare partner fit before opening tabs</h3>
+                </div>
+              </div>
+              <div className="comparison-stack">
+                {decisions.comparisons.map((comparison) => (
+                  <div className="card comparison-card" key={comparison.category}>
+                    <div className="comparison-title-row">
+                      <h3>{LABELS[comparison.category]}</h3>
+                      <span className="badge">Omnia fit, not price</span>
+                    </div>
+                    <div className="comparison-scroll">
+                      <table className="comparison-table">
+                        <thead>
+                          <tr><th>Provider</th><th>Fit</th><th>Configured</th><th>Context</th><th>Dates</th><th>Budget target</th></tr>
+                        </thead>
+                        <tbody>
+                          {comparison.offers.map((offer) => (
+                            <tr key={offer.partnerId} className={offer.partnerId === comparison.recommendedPartnerId ? 'comparison-best' : ''}>
+                              <td><strong>{offer.provider}</strong>{offer.partnerId === comparison.recommendedPartnerId && <span className="matrix-best">Best fit</span>}</td>
+                              <td>{offer.fitScore}/100</td>
+                              <td>{offer.configured ? 'Yes' : 'No'}</td>
+                              <td>{offer.contextReady ? 'Ready' : 'Missing'}</td>
+                              <td>{offer.datesIncluded ? 'Included' : 'Missing'}</td>
+                              <td>{money(offer.budgetTarget, result.plan.currency)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <div className="offer-sections">
             {categories.map((category) => (
