@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  buildFallbackIntent,
   buildTripResult,
   mergeStructuredIntent,
   type TripIntent
 } from "../../../../lib/travel";
+import { buildSafeFallbackIntent } from "../../../../lib/safe-travel-fallback";
 import { destinationsMentioned, resolveDestination } from "../../../../lib/destinations";
 import { addTravelIntelligence } from "../../../../lib/travel-intelligence";
 import { addDecisionSupport } from "../../../../lib/decision-engine";
@@ -15,7 +15,7 @@ export const runtime = "edge";
 const MAX_INPUT_CHARS = 1800;
 
 function enrichLocations(prompt: string, input: TripIntent): TripIntent {
-  let plan = { ...input };
+  const plan = { ...input };
   const mentioned = destinationsMentioned(prompt);
   const fromMatch = prompt.match(/(?:\bfrom\b|\bαπό\b|\bαπο\b)\s+([^,.;]+)/i);
   const explicitOrigin = fromMatch?.[1] ? resolveDestination(fromMatch[1]) : undefined;
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Describe the trip you want Omnia to plan." }, { status: 400 });
   }
 
-  const fallback = enrichLocations(prompt, buildFallbackIntent(prompt, country));
+  const fallback = enrichLocations(prompt, buildSafeFallbackIntent(prompt, country));
   const ai = await classifyWithAI(prompt, fallback);
   const plan = enrichLocations(prompt, ai ? mergeStructuredIntent(fallback, ai) : fallback);
   const baseResult = buildTripResult(plan, country, ai ? "ai" : "fallback");
