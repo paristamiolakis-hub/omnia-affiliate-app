@@ -1,0 +1,25 @@
+.scenario-lab { margin-top: 26px; display: grid; gap: 16px; }
+.scenario-lab textarea { width: 100%; }
+.scenario-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.scenario-card { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: rgba(255,255,255,.02); display: grid; gap: 10px; }
+.scenario-card h3, .scenario-card p { margin: 0; }
+.scenario-card .button { justify-self: start; }
+.human-commerce-page { display: grid; gap: 26px; }
+.human-decision-hero, .decision-brief { display: grid; gap: 18px; }
+.decision-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.need-priority-block { display: grid; gap: 10px; }
+.commerce-priority-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.brief-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.brief-facts > div { border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: grid; gap: 4px; }
+.brief-facts span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.brief-facts strong { overflow-wrap: anywhere; }
+.decision-checks { display: grid; gap: 8px; }
+.decision-checks ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
+@media (max-width: 980px) {
+  .scenario-grid, .commerce-priority-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .scenario-grid, .commerce-priority-grid, .decision-form-grid, .brief-facts { grid-template-columns: 1fr; }
+}
