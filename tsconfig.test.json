@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "incremental": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": ".test-dist",
+    "rootDir": ".",
+    "isolatedModules": false,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "lib/**/*.ts",
+    "tests/**/*.test.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".test-dist"
+  ]
+}
