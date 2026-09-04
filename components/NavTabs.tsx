@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 
 const TABS = [
   { href: '/', label: 'Home' },
+  { href: '/destinations', label: 'Destinations' },
   { href: '/my-trips', label: 'My Trips' },
   { href: '/analytics', label: 'Analytics' },
   { href: '/hotels', label: 'Hotels' },
@@ -19,7 +20,7 @@ export default function NavTabs() {
   return (
     <nav className="nav">
       {TABS.map(t => {
-        const active = pathname === t.href;
+        const active = pathname === t.href || (t.href === '/destinations' && pathname.startsWith('/destinations/'));
         return (
           <Link key={t.href} href={t.href} className={`tab ${active ? 'active' : ''}`}>
             {t.label}
