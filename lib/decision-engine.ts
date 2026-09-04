@@ -69,6 +69,7 @@ export interface DecisionTripPlanResult extends IntelligentTripPlanResult {
 }
 
 const CATEGORIES: TravelCategory[] = ['flights', 'hotels', 'tours', 'cars'];
+const BUDGET_KEYS: Array<TravelCategory | 'buffer'> = ['flights', 'hotels', 'tours', 'cars', 'buffer'];
 
 function rounded(value: number) {
   return Math.max(0, Math.round(value));
@@ -129,7 +130,7 @@ function buildItinerary(result: IntelligentTripPlanResult): ItineraryPlan {
     const evening = eveningFor(interests, city);
 
     const morning = first
-      ? { title: 'Arrive + orient', detail: `Settle in, learn the immediate area and avoid committing to a time-sensitive attraction right after arrival.` }
+      ? { title: 'Arrive + orient', detail: 'Settle in, learn the immediate area and avoid committing to a time-sensitive attraction right after arrival.' }
       : last
         ? { title: 'Easy final morning', detail: 'Keep the final morning low-risk and leave enough time for check-out and the airport or onward transport.' }
         : { title: highlight, detail: `Use ${highlight} as the main anchor, then keep nearby stops grouped around it.` };
@@ -231,7 +232,7 @@ function buildBudgetOptimizer(result: IntelligentTripPlanResult): BudgetOptimize
   const travelers = Math.max(1, result.plan.travelers);
   const nights = result.intelligence.nights;
   const total = result.budget.total;
-  const movements: BudgetMovement[] = [...CATEGORIES, 'buffer'].map((category) => ({
+  const movements: BudgetMovement[] = BUDGET_KEYS.map((category) => ({
     category,
     current: result.budget![category],
     recommended: recommended[category],
