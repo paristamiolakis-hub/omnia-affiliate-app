@@ -21,7 +21,6 @@ const LABELS: Record<TravelCategory, string> = {
 };
 
 type PlannerResult = TripPlanResult | IntelligentTripPlanResult;
-
 type DisplayOffer = TravelOffer | RankedTravelOffer;
 
 function money(value: number | undefined, currency: string) {
@@ -58,15 +57,20 @@ export default function TravelPlanner() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tripId = params.get('trip');
-    if (!tripId) return;
+    const prompt = params.get('prompt');
 
-    omniaStorage.getTrip(tripId).then((trip) => {
-      if (!trip) return;
-      setQuery(trip.query);
-      setResult(trip.result);
-      setActiveTripId(trip.id);
-      setSavedMessage('Loaded from My Trips');
-    });
+    if (tripId) {
+      omniaStorage.getTrip(tripId).then((trip) => {
+        if (!trip) return;
+        setQuery(trip.query);
+        setResult(trip.result);
+        setActiveTripId(trip.id);
+        setSavedMessage('Loaded from My Trips');
+      });
+      return;
+    }
+
+    if (prompt?.trim()) setQuery(prompt.trim().slice(0, 1800));
   }, []);
 
   async function submit(event?: FormEvent) {
