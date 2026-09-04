@@ -7,6 +7,7 @@ import {
 } from "../../../../lib/travel";
 import { destinationsMentioned, resolveDestination } from "../../../../lib/destinations";
 import { addTravelIntelligence } from "../../../../lib/travel-intelligence";
+import { addDecisionSupport } from "../../../../lib/decision-engine";
 
 export const runtime = "edge";
 
@@ -123,7 +124,8 @@ export async function POST(req: NextRequest) {
   const ai = await classifyWithAI(prompt, fallback);
   const plan = enrichLocations(prompt, ai ? mergeStructuredIntent(fallback, ai) : fallback);
   const baseResult = buildTripResult(plan, country, ai ? "ai" : "fallback");
-  const result = addTravelIntelligence(baseResult);
+  const intelligentResult = addTravelIntelligence(baseResult);
+  const result = addDecisionSupport(intelligentResult);
 
   console.log(JSON.stringify({
     event: "omnia.travel.plan",
@@ -131,6 +133,8 @@ export async function POST(req: NextRequest) {
     destination: result.plan.destination || null,
     needs: result.plan.needs,
     readinessScore: result.intelligence.readinessScore,
+    itineraryDays: result.decisionSupport.itinerary.days.length,
+    hasBudgetOptimizer: Boolean(result.decisionSupport.budgetOptimizer),
     hasBudget: Boolean(result.plan.budget),
     hasDates: Boolean(result.plan.checkin && result.plan.checkout),
     ts: new Date().toISOString()
