@@ -7,6 +7,7 @@ import { omniaStorage } from '@/lib/storage';
 import type { TripPlanResult, TravelCategory, TravelOffer } from '@/lib/travel';
 import type { IntelligentTripPlanResult, RankedTravelOffer } from '@/lib/travel-intelligence';
 import type { DecisionTripPlanResult } from '@/lib/decision-engine';
+import { HUMAN_PRIORITIES, type HumanPriority, type HumanTripPlanResult } from '@/lib/human-needs';
 
 const EXAMPLES = [
   'Rome 12-16 October for 2 people, budget €1200, from Athens',
@@ -21,7 +22,7 @@ const LABELS: Record<TravelCategory, string> = {
   cars: 'Car rental'
 };
 
-type PlannerResult = TripPlanResult | IntelligentTripPlanResult | DecisionTripPlanResult;
+type PlannerResult = TripPlanResult | IntelligentTripPlanResult | DecisionTripPlanResult | HumanTripPlanResult;
 type DisplayOffer = TravelOffer | RankedTravelOffer;
 
 function money(value: number | undefined, currency: string) {
@@ -37,12 +38,16 @@ function statusLabel(value: boolean, yes: string, no: string) {
   return value ? `✓ ${yes}` : `○ ${no}`;
 }
 
-function hasIntelligence(result: PlannerResult): result is IntelligentTripPlanResult | DecisionTripPlanResult {
+function hasIntelligence(result: PlannerResult): result is IntelligentTripPlanResult | DecisionTripPlanResult | HumanTripPlanResult {
   return 'intelligence' in result && Boolean(result.intelligence);
 }
 
-function hasDecisionSupport(result: PlannerResult): result is DecisionTripPlanResult {
+function hasDecisionSupport(result: PlannerResult): result is DecisionTripPlanResult | HumanTripPlanResult {
   return 'decisionSupport' in result && Boolean(result.decisionSupport);
+}
+
+function hasHumanNeeds(result: PlannerResult): result is HumanTripPlanResult {
+  return 'humanNeeds' in result && Boolean(result.humanNeeds);
 }
 
 function hasFitScore(offer: DisplayOffer): offer is RankedTravelOffer {
@@ -52,6 +57,7 @@ function hasFitScore(offer: DisplayOffer): offer is RankedTravelOffer {
 export default function TravelPlanner() {
   const { country } = useCountry();
   const [query, setQuery] = useState(EXAMPLES[0]);
+  const [priority, setPriority] = useState<HumanPriority>('balanced');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
@@ -63,12 +69,18 @@ export default function TravelPlanner() {
     const params = new URLSearchParams(window.location.search);
     const tripId = params.get('trip');
     const prompt = params.get('prompt');
+    const sharedPriority = params.get('priority');
+
+    if (HUMAN_PRIORITIES.some((item) => item.id === sharedPriority)) {
+      setPriority(sharedPriority as HumanPriority);
+    }
 
     if (tripId) {
       omniaStorage.getTrip(tripId).then((trip) => {
         if (!trip) return;
         setQuery(trip.query);
         setResult(trip.result);
+        if (hasHumanNeeds(trip.result)) setPriority(trip.result.humanNeeds.priority);
         setActiveTripId(trip.id);
         setSavedMessage('Loaded from My Trips');
       });
@@ -91,17 +103,17 @@ export default function TravelPlanner() {
       const response = await fetch('/api/travel/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: trimmed, country })
+        body: JSON.stringify({ query: trimmed, country, priority })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || 'Could not build this trip.');
-      const nextResult = data as DecisionTripPlanResult;
+      const nextResult = data as HumanTripPlanResult;
       setResult(nextResult);
       await omniaStorage.recordEvent({
         name: 'trip_search',
         destination: nextResult.plan.destination || undefined,
         country,
-        source: 'travel-planner'
+        source: `travel-planner:${priority}`
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not build this trip.');
@@ -120,6 +132,17 @@ export default function TravelPlanner() {
       setSavedMessage('Saved on this device');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function shareTrip() {
+    const params = new URLSearchParams({ prompt: query.trim().slice(0, 1800), priority });
+    const url = `${window.location.origin}/?${params.toString()}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setSavedMessage('Shareable trip link copied');
+    } catch {
+      setSavedMessage(url);
     }
   }
 
@@ -142,6 +165,7 @@ export default function TravelPlanner() {
 
   const intelligence = result && hasIntelligence(result) ? result.intelligence : undefined;
   const decisions = result && hasDecisionSupport(result) ? result.decisionSupport : undefined;
+  const human = result && hasHumanNeeds(result) ? result.humanNeeds : undefined;
 
   return (
     <section className="travel-agent" aria-labelledby="travel-agent-title">
@@ -149,8 +173,29 @@ export default function TravelPlanner() {
         <span className="eyebrow">OMNIA TRAVEL AGENT</span>
         <h2 id="travel-agent-title">Tell Omnia the trip. Get one complete plan.</h2>
         <p>
-          Describe where you want to go, when, who is travelling and your budget. Omnia turns it into a structured plan, decision support and the right partner searches.
+          Describe the trip in your own words, then tell Omnia what matters most. The recommendation changes around your priorities instead of treating every traveller the same.
         </p>
+
+        <div className="human-priority-panel" aria-labelledby="priority-title">
+          <div>
+            <span className="eyebrow">WHAT MATTERS MOST?</span>
+            <h3 id="priority-title">Choose your travel priority</h3>
+          </div>
+          <div className="priority-grid">
+            {HUMAN_PRIORITIES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`priority-card ${priority === item.id ? 'priority-active' : ''}`}
+                aria-pressed={priority === item.id}
+                onClick={() => setPriority(item.id)}
+              >
+                <strong>{item.shortLabel}</strong>
+                <span>{item.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <form onSubmit={submit} className="travel-prompt-form">
           <label className="sr-only" htmlFor="travel-prompt">Describe your trip</label>
@@ -158,13 +203,13 @@ export default function TravelPlanner() {
             id="travel-prompt"
             value={query}
             onChange={(event) => setQuery(event.target.value.slice(0, 1800))}
-            placeholder="e.g. Rome 12–16 October, 2 people, from Athens, budget €1,200"
+            placeholder="e.g. Rome 12–16 October, 2 people, from Athens, budget €1,200. Add accessibility, dietary or other important requirements here."
             rows={4}
           />
           <div className="travel-prompt-actions">
-            <span className="helper" style={{ margin: 0 }}>Country context: <b>{country}</b></span>
+            <span className="helper" style={{ margin: 0 }}>Priority: <b>{HUMAN_PRIORITIES.find((item) => item.id === priority)?.label}</b></span>
             <button className="button travel-plan-button" type="submit" disabled={loading || !query.trim()}>
-              {loading ? 'Building trip…' : 'Plan my trip'}
+              {loading ? 'Building trip…' : 'Plan for my needs'}
             </button>
           </div>
         </form>
@@ -194,6 +239,7 @@ export default function TravelPlanner() {
               </div>
               <div className="trip-actions">
                 <span className="badge">{result.generatedBy === 'ai' ? 'AI structured' : 'Smart fallback'}</span>
+                <button className="button secondary-button" type="button" onClick={shareTrip}>Share trip</button>
                 <button className="button secondary-button" type="button" onClick={saveTrip} disabled={saving}>
                   {saving ? 'Saving…' : 'Save trip'}
                 </button>
@@ -234,6 +280,43 @@ export default function TravelPlanner() {
             )}
           </div>
 
+          {human && (
+            <section className="human-package card">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">OMNIA RECOMMENDS</span>
+                  <h3>{human.package.title}</h3>
+                </div>
+                <span className="badge">{human.priorityLabel}</span>
+              </div>
+              <p className="human-package-summary">{human.package.summary}</p>
+              <div className="package-selections">
+                {human.package.selections.map((selection) => (
+                  <div key={selection.category} className="package-selection">
+                    <span>{LABELS[selection.category]}</span>
+                    <strong>{selection.provider || 'Partner needed'}</strong>
+                    <small>{selection.fitScore != null ? `${selection.fitScore}/100 fit · ` : ''}{selection.reason}</small>
+                    {selection.targetBudget != null && <em>Target {money(selection.targetBudget, result.plan.currency)}</em>}
+                  </div>
+                ))}
+              </div>
+              {human.package.targetBudget && (
+                <div className="human-budget-row">
+                  <span>Flights <b>{money(human.package.targetBudget.flights, human.package.targetBudget.currency)}</b></span>
+                  <span>Hotels <b>{money(human.package.targetBudget.hotels, human.package.targetBudget.currency)}</b></span>
+                  <span>Activities <b>{money(human.package.targetBudget.tours, human.package.targetBudget.currency)}</b></span>
+                  <span>Car <b>{money(human.package.targetBudget.cars, human.package.targetBudget.currency)}</b></span>
+                  <span>Buffer <b>{money(human.package.targetBudget.buffer, human.package.targetBudget.currency)}</b></span>
+                </div>
+              )}
+              <div className="human-reasons">
+                <div><strong>Why this setup</strong><ul>{human.package.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></div>
+                <div><strong>Before you book</strong><ul>{human.package.bookingChecks.map((check) => <li key={check}>{check}</li>)}</ul></div>
+              </div>
+              <p className="helper">{human.package.disclaimer}</p>
+            </section>
+          )}
+
           {intelligence?.destination && (
             <div className="destination-insight card">
               <div className="section-heading">
@@ -259,28 +342,17 @@ export default function TravelPlanner() {
           {decisions?.itinerary.days.length ? (
             <section className="decision-section">
               <div className="section-heading">
-                <div>
-                  <span className="eyebrow">DAY-BY-DAY</span>
-                  <h3>Flexible itinerary</h3>
-                </div>
+                <div><span className="eyebrow">DAY-BY-DAY</span><h3>Flexible itinerary</h3></div>
                 <span className="budget-target">{decisions.itinerary.days.length} planned days</span>
               </div>
               <div className="itinerary-grid">
                 {decisions.itinerary.days.map((day) => (
                   <article className="card itinerary-day" key={day.day}>
-                    <div className="itinerary-day-head">
-                      <span className="badge">Day {day.day}</span>
-                      {day.date && <span className="offer-rank">{day.date}</span>}
-                    </div>
+                    <div className="itinerary-day-head"><span className="badge">Day {day.day}</span>{day.date && <span className="offer-rank">{day.date}</span>}</div>
                     <h3>{day.title}</h3>
                     <span className="itinerary-focus">Focus: {day.focus}</span>
                     <div className="itinerary-blocks">
-                      {day.blocks.map((block) => (
-                        <div key={block.period}>
-                          <strong>{block.period} · {block.title}</strong>
-                          <p>{block.detail}</p>
-                        </div>
-                      ))}
+                      {day.blocks.map((block) => <div key={block.period}><strong>{block.period} · {block.title}</strong><p>{block.detail}</p></div>)}
                     </div>
                   </article>
                 ))}
@@ -292,13 +364,7 @@ export default function TravelPlanner() {
 
           {result.budget && (
             <div className="budget-panel card">
-              <div className="section-heading">
-                <div>
-                  <span className="eyebrow">BUDGET MAP</span>
-                  <h3>Suggested allocation</h3>
-                </div>
-                <strong>{money(result.budget.total, result.budget.currency)}</strong>
-              </div>
+              <div className="section-heading"><div><span className="eyebrow">BUDGET MAP</span><h3>Suggested allocation</h3></div><strong>{money(result.budget.total, result.budget.currency)}</strong></div>
               <div className="budget-grid">
                 {result.plan.needs.includes('flights') && <div><span>Flights</span><strong>{money(result.budget.flights, result.budget.currency)}</strong></div>}
                 {result.plan.needs.includes('hotels') && <div><span>Hotels</span><strong>{money(result.budget.hotels, result.budget.currency)}</strong></div>}
@@ -312,71 +378,43 @@ export default function TravelPlanner() {
 
           {decisions?.budgetOptimizer && (
             <section className="decision-section card budget-optimizer">
-              <div className="section-heading">
-                <div>
-                  <span className="eyebrow">BUDGET OPTIMIZER</span>
-                  <h3>Rebalance the same total budget</h3>
-                </div>
-                <strong>{money(decisions.budgetOptimizer.total, decisions.budgetOptimizer.currency)}</strong>
-              </div>
+              <div className="section-heading"><div><span className="eyebrow">BUDGET OPTIMIZER</span><h3>Rebalance the same total budget</h3></div><strong>{money(decisions.budgetOptimizer.total, decisions.budgetOptimizer.currency)}</strong></div>
               <div className="optimizer-kpis">
                 <div><span>Per person</span><strong>{money(decisions.budgetOptimizer.perPerson, decisions.budgetOptimizer.currency)}</strong></div>
                 <div><span>Per night</span><strong>{money(decisions.budgetOptimizer.perNight, decisions.budgetOptimizer.currency)}</strong></div>
                 <div><span>Per person / night</span><strong>{money(decisions.budgetOptimizer.perPersonPerNight, decisions.budgetOptimizer.currency)}</strong></div>
               </div>
               <div className="optimizer-table" role="table" aria-label="Budget allocation comparison">
-                <div className="optimizer-row optimizer-header" role="row">
-                  <span>Category</span><span>Current</span><span>Optimized</span><span>Move</span>
-                </div>
+                <div className="optimizer-row optimizer-header" role="row"><span>Category</span><span>Current</span><span>Optimized</span><span>Move</span></div>
                 {decisions.budgetOptimizer.movements.map((movement) => (
                   <div className="optimizer-row" role="row" key={movement.category}>
                     <strong>{movement.category === 'tours' ? 'Activities' : movement.category === 'cars' ? 'Car' : movement.category}</strong>
                     <span>{money(movement.current, decisions.budgetOptimizer!.currency)}</span>
                     <span>{money(movement.recommended, decisions.budgetOptimizer!.currency)}</span>
-                    <span className={movement.delta > 0 ? 'delta-up' : movement.delta < 0 ? 'delta-down' : ''}>
-                      {movement.delta > 0 ? '+' : ''}{money(movement.delta, decisions.budgetOptimizer!.currency)}
-                    </span>
+                    <span className={movement.delta > 0 ? 'delta-up' : movement.delta < 0 ? 'delta-down' : ''}>{movement.delta > 0 ? '+' : ''}{money(movement.delta, decisions.budgetOptimizer!.currency)}</span>
                   </div>
                 ))}
               </div>
-              {decisions.budgetOptimizer.recommendations.length > 0 && (
-                <ul className="optimizer-notes">
-                  {decisions.budgetOptimizer.recommendations.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              )}
+              {decisions.budgetOptimizer.recommendations.length > 0 && <ul className="optimizer-notes">{decisions.budgetOptimizer.recommendations.map((item) => <li key={item}>{item}</li>)}</ul>}
               <p className="helper">{decisions.budgetOptimizer.disclaimer}</p>
             </section>
           )}
 
           {decisions?.comparisons.length ? (
             <section className="decision-section">
-              <div className="section-heading">
-                <div>
-                  <span className="eyebrow">COMPARISON MATRIX</span>
-                  <h3>Compare partner fit before opening tabs</h3>
-                </div>
-              </div>
+              <div className="section-heading"><div><span className="eyebrow">COMPARISON MATRIX</span><h3>Compare partner fit before opening tabs</h3></div></div>
               <div className="comparison-stack">
                 {decisions.comparisons.map((comparison) => (
                   <div className="card comparison-card" key={comparison.category}>
-                    <div className="comparison-title-row">
-                      <h3>{LABELS[comparison.category]}</h3>
-                      <span className="badge">Omnia fit, not price</span>
-                    </div>
+                    <div className="comparison-title-row"><h3>{LABELS[comparison.category]}</h3><span className="badge">Omnia fit, not price</span></div>
                     <div className="comparison-scroll">
                       <table className="comparison-table">
-                        <thead>
-                          <tr><th>Provider</th><th>Fit</th><th>Configured</th><th>Context</th><th>Dates</th><th>Budget target</th></tr>
-                        </thead>
+                        <thead><tr><th>Provider</th><th>Fit</th><th>Configured</th><th>Context</th><th>Dates</th><th>Budget target</th></tr></thead>
                         <tbody>
                           {comparison.offers.map((offer) => (
                             <tr key={offer.partnerId} className={offer.partnerId === comparison.recommendedPartnerId ? 'comparison-best' : ''}>
                               <td><strong>{offer.provider}</strong>{offer.partnerId === comparison.recommendedPartnerId && <span className="matrix-best">Best fit</span>}</td>
-                              <td>{offer.fitScore}/100</td>
-                              <td>{offer.configured ? 'Yes' : 'No'}</td>
-                              <td>{offer.contextReady ? 'Ready' : 'Missing'}</td>
-                              <td>{offer.datesIncluded ? 'Included' : 'Missing'}</td>
-                              <td>{money(offer.budgetTarget, result.plan.currency)}</td>
+                              <td>{offer.fitScore}/100</td><td>{offer.configured ? 'Yes' : 'No'}</td><td>{offer.contextReady ? 'Ready' : 'Missing'}</td><td>{offer.datesIncluded ? 'Included' : 'Missing'}</td><td>{money(offer.budgetTarget, result.plan.currency)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -391,52 +429,19 @@ export default function TravelPlanner() {
           <div className="offer-sections">
             {categories.map((category) => (
               <section className="offer-section" key={category}>
-                <div className="section-heading">
-                  <div>
-                    <span className="eyebrow">STEP {categories.indexOf(category) + 1}</span>
-                    <h3>{LABELS[category]}</h3>
-                  </div>
-                  {result.budget && <span className="budget-target">Target {money(result.budget[category], result.budget.currency)}</span>}
-                </div>
-
+                <div className="section-heading"><div><span className="eyebrow">STEP {categories.indexOf(category) + 1}</span><h3>{LABELS[category]}</h3></div>{result.budget && <span className="budget-target">Target {money(result.budget[category], result.budget.currency)}</span>}</div>
                 <div className="grid">
-                  {result.offers[category].length === 0 && (
-                    <div className="card"><p>No configured affiliate partner is available for this category yet.</p></div>
-                  )}
+                  {result.offers[category].length === 0 && <div className="card"><p>No configured affiliate partner is available for this category yet.</p></div>}
                   {result.offers[category].map((offer) => (
                     <article className="card travel-offer" key={offer.id}>
-                      <div className="row">
-                        <span className="badge">{offer.badge}</span>
-                        <span className="offer-rank">#{offer.rank}</span>
-                      </div>
+                      <div className="row"><span className="badge">{offer.badge}</span><span className="offer-rank">#{offer.rank}</span></div>
                       <h3>{offer.title}</h3>
-                      {hasFitScore(offer) && (
-                        <div className="fit-score-row">
-                          <strong>{offer.fitScore}/100 fit</strong>
-                          <span>Omnia ranking, not a live-price score</span>
-                        </div>
-                      )}
+                      {hasFitScore(offer) && <div className="fit-score-row"><strong>{offer.fitScore}/100 fit</strong><span>Omnia ranking, not a live-price score</span></div>}
                       <p>{offer.description}</p>
-                      {hasFitScore(offer) && offer.fitReasons.length > 0 && (
-                        <div className="fit-reasons">
-                          {offer.fitReasons.map((reason) => <span key={reason}>{reason}</span>)}
-                        </div>
-                      )}
+                      {hasFitScore(offer) && offer.fitReasons.length > 0 && <div className="fit-reasons">{offer.fitReasons.map((reason) => <span key={reason}>{reason}</span>)}</div>}
                       <div className="offer-footer">
                         <span className="live-price-note">Price checked on partner</span>
-                        {offer.trackedUrl ? (
-                          <a
-                            className="button"
-                            href={offer.trackedUrl}
-                            target="_blank"
-                            rel="nofollow sponsored noopener"
-                            onClick={() => recordPartnerClick(offer.partnerId)}
-                          >
-                            Search {offer.provider}
-                          </a>
-                        ) : (
-                          <span className="button button-disabled">Configure partner</span>
-                        )}
+                        {offer.trackedUrl ? <a className="button" href={offer.trackedUrl} target="_blank" rel="nofollow sponsored noopener" onClick={() => recordPartnerClick(offer.partnerId)}>Search {offer.provider}</a> : <span className="button button-disabled">Configure partner</span>}
                       </div>
                     </article>
                   ))}
@@ -445,19 +450,28 @@ export default function TravelPlanner() {
             ))}
           </div>
 
+          {human && (
+            <section className="human-checklist card">
+              <span className="eyebrow">BEFORE YOU GO</span>
+              <h3>Human travel checklist</h3>
+              <div className="checklist-grid">
+                {human.checklist.map((item) => (
+                  <div key={item.id} className="checklist-item">
+                    <span className={`check-importance ${item.importance}`}>{item.importance}</span>
+                    <strong>{item.label}</strong>
+                    <p>{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {intelligence && intelligence.nextBestActions.length > 0 && (
-            <div className="planner-notes card">
-              <span className="eyebrow">NEXT BEST ACTIONS</span>
-              <h3>Make this trip more decision-ready</h3>
-              <ul>{intelligence.nextBestActions.map((action) => <li key={action}>{action}</li>)}</ul>
-            </div>
+            <div className="planner-notes card"><span className="eyebrow">NEXT BEST ACTIONS</span><h3>Make this trip more decision-ready</h3><ul>{intelligence.nextBestActions.map((action) => <li key={action}>{action}</li>)}</ul></div>
           )}
 
           {!intelligence && result.warnings.length > 0 && (
-            <div className="planner-notes card">
-              <h3>Improve this plan</h3>
-              <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-            </div>
+            <div className="planner-notes card"><h3>Improve this plan</h3><ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>
           )}
         </div>
       )}
