@@ -2,6 +2,7 @@ import '../styles/globals.css';
 import '../styles/platform.css';
 import '../styles/intelligence.css';
 import '../styles/human-needs.css';
+import '../styles/human-decisions.css';
 import Link from 'next/link';
 import NavTabs from '@/components/NavTabs';
 import CountrySelect from '@/components/CountrySelect';
