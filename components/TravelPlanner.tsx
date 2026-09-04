@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useCountry } from '@/components/CountryContext';
+import { omniaStorage } from '@/lib/storage';
 import type { TripPlanResult, TravelCategory } from '@/lib/travel';
 
 const EXAMPLES = [
@@ -34,8 +35,25 @@ export default function TravelPlanner() {
   const { country } = useCountry();
   const [query, setQuery] = useState(EXAMPLES[0]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedMessage, setSavedMessage] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<TripPlanResult | null>(null);
+  const [activeTripId, setActiveTripId] = useState<string | undefined>();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tripId = params.get('trip');
+    if (!tripId) return;
+
+    omniaStorage.getTrip(tripId).then((trip) => {
+      if (!trip) return;
+      setQuery(trip.query);
+      setResult(trip.result);
+      setActiveTripId(trip.id);
+      setSavedMessage('Loaded from My Trips');
+    });
+  }, []);
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -44,6 +62,8 @@ export default function TravelPlanner() {
 
     setLoading(true);
     setError('');
+    setSavedMessage('');
+    setActiveTripId(undefined);
     try {
       const response = await fetch('/api/travel/plan', {
         method: 'POST',
@@ -52,12 +72,43 @@ export default function TravelPlanner() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || 'Could not build this trip.');
-      setResult(data as TripPlanResult);
+      const nextResult = data as TripPlanResult;
+      setResult(nextResult);
+      await omniaStorage.recordEvent({
+        name: 'trip_search',
+        destination: nextResult.plan.destination || undefined,
+        country,
+        source: 'travel-planner'
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not build this trip.');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function saveTrip() {
+    if (!result || saving) return;
+    setSaving(true);
+    setSavedMessage('');
+    try {
+      const trip = await omniaStorage.saveTrip({ query, country, result });
+      setActiveTripId(trip.id);
+      setSavedMessage('Saved on this device');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function recordPartnerClick(partner: string) {
+    await omniaStorage.recordEvent({
+      name: 'affiliate_click',
+      tripId: activeTripId,
+      partner,
+      source: 'travel-planner',
+      destination: result?.plan.destination || undefined,
+      country
+    });
   }
 
   const categories = useMemo(() => {
@@ -115,8 +166,14 @@ export default function TravelPlanner() {
                   {result.plan.checkout ? ` → ${result.plan.checkout}` : ''}
                 </p>
               </div>
-              <span className="badge">{result.generatedBy === 'ai' ? 'AI structured' : 'Smart fallback'}</span>
+              <div className="trip-actions">
+                <span className="badge">{result.generatedBy === 'ai' ? 'AI structured' : 'Smart fallback'}</span>
+                <button className="button secondary-button" type="button" onClick={saveTrip} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save trip'}
+                </button>
+              </div>
             </div>
+            {savedMessage && <p className="save-message">{savedMessage}</p>}
 
             <div className="trip-facts">
               <div><span>Travellers</span><strong>{result.plan.travelers}</strong></div>
@@ -190,6 +247,7 @@ export default function TravelPlanner() {
                             href={offer.trackedUrl}
                             target="_blank"
                             rel="nofollow sponsored noopener"
+                            onClick={() => recordPartnerClick(offer.partnerId)}
                           >
                             Search {offer.provider}
                           </a>
