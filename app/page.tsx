@@ -1,4 +1,5 @@
 import TravelPlanner from '@/components/TravelPlanner';
+import TravelScenarioLab from '@/components/TravelScenarioLab';
 import SmartSearch from '@/components/SmartSearch';
 import OmniaAssistant from '@/components/OmniaAssistant';
 
@@ -6,6 +7,7 @@ export default function Page() {
   return (
     <main>
       <TravelPlanner />
+      <TravelScenarioLab />
 
       <section className="legacy-search-section" aria-labelledby="quick-search-title">
         <div className="section-heading">
