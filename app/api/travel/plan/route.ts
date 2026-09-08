@@ -9,6 +9,7 @@ import { destinationsMentioned, resolveDestination } from "../../../../lib/desti
 import { addTravelIntelligence } from "../../../../lib/travel-intelligence";
 import { addDecisionSupport } from "../../../../lib/decision-engine";
 import { addHumanNeeds } from "../../../../lib/human-needs";
+import { applyTravelPreferences } from "../../../../lib/preferences";
 
 export const runtime = "edge";
 
@@ -112,6 +113,14 @@ async function classifyWithAI(prompt: string, base: TripIntent) {
   }
 }
 
+function cookiePreferences(req: NextRequest) {
+  const rawTravelers = Number(req.cookies.get('omnia_travelers')?.value);
+  return {
+    homeDeparture: decodeURIComponent(req.cookies.get('omnia_home_departure')?.value || '').slice(0, 80),
+    travelers: Number.isInteger(rawTravelers) && rawTravelers >= 1 && rawTravelers <= 20 ? rawTravelers : 2
+  };
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const prompt = String(body?.query || "").trim().slice(0, MAX_INPUT_CHARS);
@@ -124,7 +133,8 @@ export async function POST(req: NextRequest) {
 
   const fallback = enrichLocations(prompt, buildSafeFallbackIntent(prompt, country));
   const ai = await classifyWithAI(prompt, fallback);
-  const plan = enrichLocations(prompt, ai ? mergeStructuredIntent(fallback, ai) : fallback);
+  const extracted = enrichLocations(prompt, ai ? mergeStructuredIntent(fallback, ai) : fallback);
+  const plan = enrichLocations(prompt, applyTravelPreferences(extracted, cookiePreferences(req)));
   const baseResult = buildTripResult(plan, country, ai ? "ai" : "fallback");
   const intelligentResult = addTravelIntelligence(baseResult);
   const decisionResult = addDecisionSupport(intelligentResult);

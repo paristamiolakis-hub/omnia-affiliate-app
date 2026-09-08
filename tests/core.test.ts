@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { destinationsMentioned, resolveDestination } from '../lib/destinations';
 import { allocateBudget, type TripIntent } from '../lib/travel';
 import { buildSafeFallbackIntent } from '../lib/safe-travel-fallback';
+import { applyTravelPreferences, sanitizePreferences } from '../lib/preferences';
 import {
   PARTNER_CAPABILITIES,
   assertLiveQuote,
@@ -72,6 +73,27 @@ test('disabled travel categories receive zero allocation', () => {
   assert.equal(allocation.tours, 0);
   assert.equal(allocation.cars, 0);
   assert.equal(allocation.hotels + allocation.buffer, 999);
+});
+
+test('preference sanitizer rejects invalid values and keeps safe defaults', () => {
+  const preferences = sanitizePreferences({ travelers: 200, travelPriority: 'cheapest', homeDeparture: 42 });
+  assert.equal(preferences.travelers, 2);
+  assert.equal(preferences.travelPriority, 'balanced');
+  assert.equal(preferences.homeDeparture, '');
+});
+
+test('travel preferences fill only details the user left out', () => {
+  const missing = plan({ rawQuery: 'Rome in October', origin: undefined, originIata: undefined, travelers: 2 });
+  const personalized = applyTravelPreferences(missing, { homeDeparture: 'Heraklion', travelers: 4 });
+  assert.equal(personalized.origin, 'Heraklion');
+  assert.equal(personalized.originIata, 'HER');
+  assert.equal(personalized.travelers, 4);
+
+  const explicit = plan({ rawQuery: 'Rome from Athens for 3 people', travelers: 3 });
+  const unchanged = applyTravelPreferences(explicit, { homeDeparture: 'Heraklion', travelers: 4 });
+  assert.equal(unchanged.origin, 'Athens');
+  assert.equal(unchanged.originIata, 'ATH');
+  assert.equal(unchanged.travelers, 3);
 });
 
 test('current partner registry never claims live pricing or availability', () => {
