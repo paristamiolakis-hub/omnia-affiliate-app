@@ -3,18 +3,20 @@ import '../styles/platform.css';
 import '../styles/intelligence.css';
 import '../styles/human-needs.css';
 import '../styles/human-decisions.css';
+import '../styles/mobile.css';
 import Link from 'next/link';
 import NavTabs from '@/components/NavTabs';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import CountrySelect from '@/components/CountrySelect';
 import { CountryProvider } from '@/components/CountryContext';
 
 export const metadata = {
   title: 'Omnia – AI Travel & Shopping Agent',
-  description: 'Tell Omnia what you want to do. Get a structured travel plan, budget map and trusted partner searches in one place.',
+  description: 'Tell Omnia what you need. Get a simple, structured decision flow for travel, shopping and finance.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   openGraph: {
     title: 'Omnia – AI Travel & Shopping Agent',
-    description: 'Plan a complete trip from one natural-language request.',
+    description: 'Start with what you need. Omnia handles the categories underneath.',
     type: 'website'
   }
 };
@@ -24,12 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <CountryProvider>
-          <div className="container">
-            <header className="header">
-              <div className="brand">
+          <div className="container app-container">
+            <header className="header app-header">
+              <Link href="/" className="brand brand-link" aria-label="Omnia home">
                 <div className="logo" aria-hidden="true" />
                 <h1>Omnia</h1>
-              </div>
+              </Link>
               <CountrySelect />
             </header>
             <NavTabs />
@@ -41,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </footer>
           </div>
+          <MobileBottomNav />
         </CountryProvider>
       </body>
     </html>
