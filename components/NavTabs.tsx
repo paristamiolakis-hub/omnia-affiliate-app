@@ -2,31 +2,47 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const TABS = [
+const PRIMARY_TABS = [
   { href: '/', label: 'Home' },
-  { href: '/destinations', label: 'Destinations' },
   { href: '/my-trips', label: 'My Trips' },
-  { href: '/analytics', label: 'Analytics' },
-  { href: '/hotels', label: 'Hotels' },
-  { href: '/cars', label: 'Cars' },
-  { href: '/flights', label: 'Flights' },
-  { href: '/tours', label: 'Tours' },
-  { href: '/shops', label: 'Shops' },
+  { href: '/destinations', label: 'Explore' },
+  { href: '/shops', label: 'Shopping' },
   { href: '/finance', label: 'Finance' }
 ];
+
+const SECONDARY_TABS = [
+  { href: '/flights', label: 'Flights' },
+  { href: '/hotels', label: 'Hotels' },
+  { href: '/tours', label: 'Tours' },
+  { href: '/cars', label: 'Cars' },
+  { href: '/analytics', label: 'Analytics' }
+];
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
+}
 
 export default function NavTabs() {
   const pathname = usePathname();
   return (
-    <nav className="nav">
-      {TABS.map(t => {
-        const active = pathname === t.href || (t.href === '/destinations' && pathname.startsWith('/destinations/'));
-        return (
-          <Link key={t.href} href={t.href} className={`tab ${active ? 'active' : ''}`}>
+    <div className="desktop-nav-wrap">
+      <nav className="nav primary-nav" aria-label="Primary navigation">
+        {PRIMARY_TABS.map((t) => (
+          <Link key={t.href} href={t.href} className={`tab ${isActive(pathname, t.href) ? 'active' : ''}`}>
             {t.label}
           </Link>
-        );
-      })}
-    </nav>
+        ))}
+      </nav>
+      <details className="more-nav">
+        <summary>More</summary>
+        <nav aria-label="Secondary navigation" className="more-nav-menu">
+          {SECONDARY_TABS.map((t) => (
+            <Link key={t.href} href={t.href} className={isActive(pathname, t.href) ? 'active' : ''}>
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      </details>
+    </div>
   );
 }
